@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import { SessionManager, type SessionEntry } from "@mariozechner/pi-coding-agent";
 import { deriveSessionTotalTokens, hasNonzeroUsage, normalizeUsage } from "../agents/usage.js";
 import { jsonUtf8Bytes } from "../infra/json-utf8-bytes.js";
 import { hasInterSessionUserProvenance } from "../sessions/input-provenance.js";

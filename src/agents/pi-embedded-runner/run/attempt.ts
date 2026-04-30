@@ -24,7 +24,7 @@ import { getMachineDisplayName } from "../../../infra/machine-name.js";
 import { MAX_IMAGE_BYTES } from "../../../media/constants.js";
 import { listRegisteredPluginAgentPromptGuidance } from "../../../plugins/command-registry-state.js";
 import { requestSingleHookApproval } from "../../../plugins/hook-approval.js";
-import { type HookDecisionAsk, resolveBlockMessage } from "../../../plugins/hook-decision-types.js";
+import { resolveBlockMessage } from "../../../plugins/hook-decision-types.js";
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
 import {
   extractModelCompat,
@@ -2706,7 +2706,7 @@ export async function runEmbeddedAttempt(
                 promptErrorSource = "hook:before_agent_run";
                 skipPromptSubmission = true;
               } else if (approvalResult === "timeout") {
-                const behavior = (beforeRunDecision as HookDecisionAsk).timeoutBehavior ?? "deny";
+                const behavior = beforeRunDecision.timeoutBehavior ?? "deny";
                 if (behavior === "deny") {
                   log.warn(`before_agent_run hook approval timed out (behavior=deny)`);
                   const timeoutMsg = beforeRunDecision.denialMessage ?? "Approval timed out.";
