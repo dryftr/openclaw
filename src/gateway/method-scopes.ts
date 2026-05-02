@@ -150,6 +150,7 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "tools.invoke",
     "chat.send",
     "chat.abort",
+    "chat.transcribeAudio",
     "sessions.create",
     "sessions.send",
     "sessions.steer",
