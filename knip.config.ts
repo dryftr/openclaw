@@ -111,7 +111,7 @@ const config = {
   workspaces: {
     ".": {
       entry: rootEntries,
-      ignoreDependencies: ["@openclaw/*", "playwright-core", "sqlite-vec"],
+      ignoreDependencies: ["@homebridge/ciao", "@openclaw/*", "playwright-core", "sqlite-vec"],
       project: [
         "src/**/*.ts!",
         "scripts/**/*.{js,mjs,cjs,ts,mts,cts}!",
