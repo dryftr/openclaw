@@ -41,7 +41,7 @@ function formatPackageSearchLine(entry: ClawHubPackageSearchResult): string {
   const flags = [
     pkg.family,
     pkg.channel,
-    pkg.isOfficial ? "official" : undefined,
+    pkg.isOfficial && pkg.channel !== "official" ? "official" : undefined,
     pkg.latestVersion ? `v${pkg.latestVersion}` : undefined,
   ].filter(Boolean);
   const summary = pkg.summary ? `  ${theme.muted(pkg.summary)}` : "";
