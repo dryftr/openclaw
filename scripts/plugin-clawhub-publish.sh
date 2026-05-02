@@ -81,7 +81,7 @@ printf ' %q' "${publish_cmd[@]}"
 printf '\n'
 
 if [[ "${mode}" == "--dry-run" ]]; then
-  CLAWHUB_WORKDIR="${clawhub_workdir}" "${publish_cmd[@]}" --dry-run
+  echo "Dry run: not invoking ClawHub publish."
   exit 0
 fi
 
