@@ -1,9 +1,13 @@
 import { Type } from "typebox";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { SsrFBlockedError, type LookupFn, type SsrFPolicy } from "../../infra/net/ssrf.js";
-import { logDebug } from "../../logger.js";
+import { logDebug, logInfo } from "../../logger.js";
 import type { RuntimeWebFetchMetadata } from "../../secrets/runtime-web-tools.types.js";
-import { wrapExternalContent, wrapWebContent } from "../../security/external-content.js";
+import {
+  detectSuspiciousPatterns,
+  wrapExternalContent,
+  wrapWebContent,
+} from "../../security/external-content.js";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalLowercaseString,
@@ -312,6 +316,13 @@ function normalizeProviderWebFetchPayload(params: {
 }): Record<string, unknown> {
   const payload = isRecord(params.payload) ? params.payload : {};
   const rawText = typeof payload.text === "string" ? payload.text : "";
+  // Scan provider content for suspicious patterns (injection indicators)
+  const suspiciousPatterns = detectSuspiciousPatterns(rawText);
+  if (suspiciousPatterns.length > 0) {
+    logInfo(
+      `[web-fetch] Suspicious patterns detected in provider content (provider: ${params.providerId}, url: ${redactUrlForDebugLog(params.requestedUrl)}, patterns: ${suspiciousPatterns.join(", ")})`,
+    );
+  }
   const wrapped = wrapWebFetchContent(rawText, params.maxChars);
   const url = params.requestedUrl;
   const finalUrl = normalizeProviderFinalUrl(payload.finalUrl) ?? url;
@@ -567,6 +578,14 @@ async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string
         text = body;
         extractor = "raw";
       }
+    }
+
+    // Scan fetched content for suspicious patterns (injection indicators)
+    const suspiciousPatterns = detectSuspiciousPatterns(text);
+    if (suspiciousPatterns.length > 0) {
+      logInfo(
+        `[web-fetch] Suspicious patterns detected in fetched content (url: ${redactUrlForDebugLog(finalUrl)}, patterns: ${suspiciousPatterns.join(", ")})`,
+      );
     }
 
     const wrapped = wrapWebFetchContent(text, params.maxChars);
