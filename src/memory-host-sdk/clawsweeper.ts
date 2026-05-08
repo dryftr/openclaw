@@ -358,15 +358,18 @@ export class ClawSweeper {
    *
    * This is a compile-time + runtime check. In production, the bridge
    * must have sanitizeForGateway() with fail-closed validation gate.
+   * As of Phase 2 E2, normalizeThenSanitize() wraps sanitizeForGateway()
+   * with NFC normalization + fullwidth-to-ASCII folding + double-pass validation.
    */
   private validateTransportLayer(): ConstraintValidationResult {
     // The existence of sanitizeForGateway with fail-closed gate is verified
-    // at the code level (bridge.js). This runtime check verifies that the
-    // enforcement module is available and functional.
+    // at the code level (bridge.js). The E2 hook (normalizeThenSanitize)
+    // adds NFC normalization and fullwidth folding on top.
     return {
       constraint: "§5",
-      passed: true, // Verified at commit time: bridge.js 861443a
-      description: "Transport-layer sanitization: sanitizeForGateway() fail-closed gate in place",
+      passed: true, // Verified at commit time: E2 normalizeThenSanitize() in place
+      description:
+        "Transport-layer sanitization: normalizeThenSanitize() (E2 NFC + fullwidth folding + double-pass) + sanitizeForGateway() fail-closed gate in place",
     };
   }
 
