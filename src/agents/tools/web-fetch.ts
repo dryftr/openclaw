@@ -192,6 +192,7 @@ function redactUrlForDebugLog(rawUrl: string): string {
   }
 }
 
+const EXTERNAL_CONTENT_WARNING_MIN_LENGTH = EXTERNAL_CONTENT_WARNING.length + 200; // §5.2.3: Floor that preserves SECURITY NOTICE + minimum body
 const WEB_FETCH_WRAPPER_WITH_WARNING_OVERHEAD = wrapWebContent("", "web_fetch").length;
 const WEB_FETCH_WRAPPER_NO_WARNING_OVERHEAD = wrapExternalContent("", {
   source: "web_fetch",
@@ -210,6 +211,23 @@ function wrapWebFetchContent(
   if (maxChars <= 0) {
     return { text: "", truncated: true, rawLength: 0, wrappedLength: 0 };
   }
+
+  // §5.2.3 — Truncation floor: If maxChars would cut the SECURITY NOTICE,
+  // the content doesn't ship. Return a minimal blocked indicator instead.
+  // The floor preserves: SECURITY NOTICE + boundary markers + minimum body.
+  if (maxChars < EXTERNAL_CONTENT_WARNING_MIN_LENGTH) {
+    // Too small to include SECURITY NOTICE — return blocked indicator
+    return {
+      text: wrapExternalContent(
+        "[CONTENT BLOCKED: Truncation would remove security notice. Increase maxChars.]",
+        { source: "web_fetch", includeWarning: true },
+      ),
+      truncated: true,
+      rawLength: value.length,
+      wrappedLength: 0,
+    };
+  }
+
   const includeWarning = maxChars >= WEB_FETCH_WRAPPER_WITH_WARNING_OVERHEAD;
   const wrapperOverhead = includeWarning
     ? WEB_FETCH_WRAPPER_WITH_WARNING_OVERHEAD
@@ -249,11 +267,15 @@ function wrapWebFetchContent(
   };
 }
 
+// §5.2.2 — Metadata fields (title, URL display) are wrapped with security notice.
+// Title and URL metadata displayed to agents must carry the same security boundary
+// as the body content. A crafted page can display clean links while the body
+// contains the exploit — metadata wrapping prevents this bypass.
 function wrapWebFetchField(value: string | undefined): string | undefined {
   if (!value) {
     return value;
   }
-  return wrapExternalContent(value, { source: "web_fetch", includeWarning: false });
+  return wrapExternalContent(value, { source: "web_fetch", includeWarning: true });
 }
 
 function normalizeContentType(value: string | null | undefined): string | undefined {
@@ -316,12 +338,40 @@ function normalizeProviderWebFetchPayload(params: {
 }): Record<string, unknown> {
   const payload = isRecord(params.payload) ? params.payload : {};
   const rawText = typeof payload.text === "string" ? payload.text : "";
-  // Scan provider content for suspicious patterns (injection indicators)
+  // §5.2 — Enforcement-wired suspicious pattern detection
+  // Phase 2: Block on match. Content with injection indicators is rejected
+  // entirely rather than passed through with a warning.
   const suspiciousPatterns = detectSuspiciousPatterns(rawText);
   if (suspiciousPatterns.length > 0) {
     logInfo(
-      `[web-fetch] Suspicious patterns detected in provider content (provider: ${params.providerId}, url: ${redactUrlForDebugLog(params.requestedUrl)}, patterns: ${suspiciousPatterns.join(", ")})`,
+      `[web-fetch] BLOCKED: Suspicious patterns detected in provider content — content rejected (provider: ${params.providerId}, url: ${redactUrlForDebugLog(params.requestedUrl)}, patterns: ${suspiciousPatterns.join(", ")})`,
     );
+    // §5.2 enforcement: return a blocked payload instead of forwarding
+    return {
+      url: params.requestedUrl,
+      finalUrl: params.requestedUrl,
+      status: 200,
+      extractMode: params.extractMode,
+      extractor: params.providerId,
+      externalContent: {
+        untrusted: true,
+        source: "web_fetch",
+        wrapped: true,
+        blocked: true,
+        blockReason: `Injection patterns detected: ${suspiciousPatterns.join(", ")}`,
+        provider: params.providerId,
+      },
+      truncated: false,
+      length: 0,
+      rawLength: rawText.length,
+      wrappedLength: 0,
+      fetchedAt: new Date().toISOString(),
+      tookMs: params.tookMs,
+      text: wrapWebContent(
+        `[CONTENT BLOCKED: Injection patterns detected in external content. Patterns: ${suspiciousPatterns.join(", ")}]`,
+        "web_fetch",
+      ),
+    };
   }
   const wrapped = wrapWebFetchContent(rawText, params.maxChars);
   const url = params.requestedUrl;
@@ -580,12 +630,43 @@ async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string
       }
     }
 
-    // Scan fetched content for suspicious patterns (injection indicators)
+    // §5.2 — Enforcement-wired suspicious pattern detection
+    // Phase 2: Block on match. Content with injection indicators is rejected
+    // entirely rather than passed through with a warning.
     const suspiciousPatterns = detectSuspiciousPatterns(text);
     if (suspiciousPatterns.length > 0) {
       logInfo(
-        `[web-fetch] Suspicious patterns detected in fetched content (url: ${redactUrlForDebugLog(finalUrl)}, patterns: ${suspiciousPatterns.join(", ")})`,
+        `[web-fetch] BLOCKED: Suspicious patterns detected in fetched content — content rejected (url: ${redactUrlForDebugLog(finalUrl)}, patterns: ${suspiciousPatterns.join(", ")})`,
       );
+      // §5.2 enforcement: return a blocked payload instead of forwarding
+      const blockedPayload = {
+        url: params.url,
+        finalUrl,
+        status: res.status,
+        contentType: normalizedContentType,
+        extractMode: params.extractMode,
+        extractor,
+        externalContent: {
+          untrusted: true,
+          source: "web_fetch",
+          wrapped: true,
+          blocked: true,
+          blockReason: `Injection patterns detected: ${suspiciousPatterns.join(", ")}`,
+        },
+        truncated: false,
+        length: 0,
+        rawLength: text.length,
+        wrappedLength: 0,
+        fetchedAt: new Date().toISOString(),
+        tookMs: Date.now() - start,
+        text: wrapWebContent(
+          `[CONTENT BLOCKED: Injection patterns detected in external content. Patterns: ${suspiciousPatterns.join(", ")}]`,
+          "web_fetch",
+        ),
+        warning: undefined,
+      };
+      writeCache(FETCH_CACHE, cacheKey, blockedPayload, params.cacheTtlMs);
+      return blockedPayload;
     }
 
     const wrapped = wrapWebFetchContent(text, params.maxChars);
