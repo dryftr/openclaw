@@ -436,7 +436,7 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
       mediaUrls: resolveSendableOutboundReplyParts(payload).mediaUrls,
       caption: "",
       send: async ({ mediaUrl }) => {
-        await sendMediaFeishu({
+        const result = await sendMediaFeishu({
           cfg,
           to: chatId,
           mediaUrl,
@@ -445,6 +445,25 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
           accountId,
           ...(payload.audioAsVoice === true ? { audioAsVoice: true } : {}),
         });
+        if (result?.voiceIntentDegradedToFile && options?.fallbackText && !sentFallbackText) {
+          sentFallbackText = true;
+          await sendChunkedTextReply({
+            text: options.fallbackText,
+            useCard: false,
+            infoKind: "final",
+            sendChunk: async ({ chunk, isFirst }) => {
+              await sendMessageFeishu({
+                cfg,
+                to: chatId,
+                text: chunk,
+                replyToMessageId: sendReplyToMessageId,
+                replyInThread: effectiveReplyInThread,
+                mentions: isFirst ? mentionTargets : undefined,
+                accountId,
+              });
+            },
+          });
+        }
       },
     });
   };
