@@ -144,6 +144,8 @@ export type MemoryDreamingConfig = {
 export type MemoryDreamingWorkspace = {
   workspaceDir: string;
   agentIds: string[];
+  /** Whether this workspace is shared across multiple agents (Bug #65374). */
+  shared?: boolean;
 };
 
 const DEFAULT_MEMORY_LIGHT_DREAMING_SOURCES: MemoryLightDreamingSource[] = [
@@ -632,9 +634,10 @@ export function resolveMemoryDreamingWorkspaces(cfg: OpenClawConfig): MemoryDrea
     const existing = byWorkspace.get(key);
     if (existing) {
       existing.agentIds.push(agentId);
+      existing.shared = true; // Multiple agents share this workspace
       continue;
     }
-    byWorkspace.set(key, { workspaceDir, agentIds: [agentId] });
+    byWorkspace.set(key, { workspaceDir, agentIds: [agentId], shared: false });
   }
   return [...byWorkspace.values()];
 }

@@ -514,12 +514,7 @@ export async function runShortTermDreamingPromotionIfTriggered(params: {
   const recencyHalfLifeDays =
     params.config.recencyHalfLifeDays ?? DEFAULT_MEMORY_DREAMING_RECENCY_HALF_LIFE_DAYS;
   const fallbackWorkspaceDir = normalizeTrimmedString(params.workspaceDir);
-  const workspaceEntries = params.cfg
-    ? resolveMemoryDreamingWorkspaces(params.cfg, {
-        primaryWorkspaceDir: fallbackWorkspaceDir,
-        primaryAgentId: "main",
-      })
-    : [];
+  const workspaceEntries = params.cfg ? resolveMemoryDreamingWorkspaces(params.cfg) : [];
   // Warn on shared workspaces (Bug #65374 — cross-agent dreaming contamination risk)
   for (const entry of workspaceEntries) {
     if (entry.shared && entry.agentIds.length > 1) {
@@ -615,8 +610,10 @@ export async function runShortTermDreamingPromotionIfTriggered(params: {
         recencyHalfLifeDays,
         maxAgeDays: params.config.maxAgeDays,
         nowMs: sweepNowMs,
-        // Bug #65374: Use per-workspace isolation metadata instead of global .some()
-        currentAgentId: params.currentAgentId ?? workspaceMeta.get(workspaceDir)?.agentIds[0],
+        // Bug #65374: Fail-closed — do NOT synthesize a fallback agent ID.
+        // If no currentAgentId is available and the workspace is shared, the ranking
+        // path in short-term-promotion will return no candidates (safe default).
+        currentAgentId: params.currentAgentId,
         isShared: workspaceMeta.get(workspaceDir)?.isShared ?? false,
       });
       totalCandidates += candidates.length;
