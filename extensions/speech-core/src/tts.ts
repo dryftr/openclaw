@@ -38,6 +38,7 @@ import {
   resolveConfigDir,
   resolveUserPath,
   stripMarkdown,
+  stripForTts,
 } from "openclaw/plugin-sdk/text-runtime";
 import {
   canonicalizeSpeechProviderId,
@@ -1598,7 +1599,7 @@ export async function maybeApplyTtsToPayload(params: {
     }
   }
 
-  textForAudio = stripMarkdown(textForAudio).trim();
+  textForAudio = stripForTts(textForAudio).trim();
   if (!textForAudio) {
     return nextPayload;
   }

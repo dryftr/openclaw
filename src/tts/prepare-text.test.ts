@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { stripMarkdown } from "../shared/text/strip-markdown.js";
+import { stripTtsMarkdown, stripForTts } from "../shared/text/strip-tts-markdown.js";
 
 /**
  * Tests that stripMarkdown (used in the TTS pipeline via maybeApplyTtsToPayload)
